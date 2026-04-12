@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>料理上達ロードマップ</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#e8a045">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="料理道場">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -185,5 +191,11 @@
   <script src="js/roadmap.js"></script>
   <script src="js/recipe.js"></script>
   <script src="js/api.js"></script>
+  <script>
+    // サービスワーカーを登録してPWA機能を有効化
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/culinary-roadmap/sw.js');
+    }
+  </script>
 </body>
 </html>
