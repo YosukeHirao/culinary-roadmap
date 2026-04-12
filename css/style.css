@@ -1741,6 +1741,34 @@ a {
 }
 .mission-item.completed .mission-progress-label { color: #4caf50; }
 
+.mission-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.mission-progress-mini {
+  flex: 1;
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mission-progress-mini-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.mission-item.completed .mission-progress-mini-fill { background: #4caf50; }
+.mission-progress-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mission-item.completed .mission-progress-count { color: #4caf50; }
+
 .mission-manual-btn {
   flex-shrink: 0;
   background: transparent;

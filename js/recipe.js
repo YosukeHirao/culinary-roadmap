@@ -93,7 +93,6 @@ const Recipe = (() => {
       ) {
         recipesState.unlockedIds.push(recipe.id);
         updated = true;
-        showToast(`🎉 「${recipe.title}」が解除されました！`);
       }
     });
 
@@ -170,6 +169,16 @@ const Recipe = (() => {
     }
 
     container.innerHTML = html;
+
+    // 検索中はフォーカスを維持する（再描画でinputが置き換わるため）
+    if (filterState.search) {
+      const searchInput = container.querySelector('.filter-search');
+      if (searchInput) {
+        searchInput.focus();
+        const len = searchInput.value.length;
+        searchInput.setSelectionRange(len, len);
+      }
+    }
   }
 
   /**
@@ -539,6 +548,11 @@ const Recipe = (() => {
 
     if (isStamped) {
       recipesState.stampedIds = recipesState.stampedIds.filter(id => id !== recipeId);
+      // スタンプ取り消し時：進めたミッションを1段階戻す
+      const recipeForUndo = getRecipeById(recipeId, recipesState);
+      if (recipeForUndo?.frameworks?.length) {
+        Roadmap.decrementMissionsForFrameworks(recipeForUndo.frameworks);
+      }
     } else {
       recipesState.stampedIds.push(recipeId);
       // スタンプ時：レシピのフレームワークに紐づくミッションを1段階進める
