@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>料理上達ロードマップ</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ホームビュー -->
+  <div id="view-home" class="view">
+    <main class="main-content">
+      <header class="hero-header">
+        <div class="hero-title">🍴 Culinary Master</div>
+        <div class="hero-subtitle">科学で理解する、感動を生む料理へ</div>
+      </header>
+
+      <section class="overall-progress-section">
+        <div class="section-header">
+          <span class="section-label">総合習熟度</span>
+          <span class="section-value" id="overall-percent">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="overall-progress-fill" style="width:0%"></div>
+        </div>
+      </section>
+
+      <section class="framework-section">
+        <div class="section-title">フレームワーク</div>
+        <div class="framework-cards" id="framework-cards"></div>
+      </section>
+
+      <section class="quick-actions">
+        <div class="section-title">クイックアクション</div>
+        <div class="quick-actions-grid">
+          <button class="action-btn" onclick="App.navigate('roadmap')">
+            <span class="action-icon">🗺️</span>
+            <span class="action-label">ロードマップを見る</span>
+          </button>
+          <button class="action-btn" onclick="App.navigate('recipes')">
+            <span class="action-icon">📖</span>
+            <span class="action-label">レシピを確認する</span>
+          </button>
+          <button class="action-btn action-btn--accent" onclick="App.navigate('ai-generate')">
+            <span class="action-icon">✨</span>
+            <span class="action-label">AIレシピを生成</span>
+          </button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ロードマップビュー -->
+  <div id="view-roadmap" class="view">
+    <main class="main-content">
+      <header class="page-header">
+        <h1 class="page-title">🗺️ ロードマップ</h1>
+        <p class="page-subtitle">5つのフレームワークをマスターしよう</p>
+      </header>
+      <div id="framework-list"></div>
+    </main>
+  </div>
+
+  <!-- フレームワーク詳細ビュー -->
+  <div id="view-framework-detail" class="view">
+    <main class="main-content">
+      <div class="back-bar">
+        <button class="back-btn" onclick="App.navigate('roadmap')">
+          <span class="back-icon">←</span>
+          <span>ロードマップに戻る</span>
+        </button>
+      </div>
+      <h1 class="fw-detail-title" id="fw-detail-title"></h1>
+      <div id="fw-detail-content"></div>
+    </main>
+  </div>
+
+  <!-- レシピ一覧ビュー -->
+  <div id="view-recipes" class="view">
+    <main class="main-content">
+      <header class="page-header">
+        <h1 class="page-title">📖 レシピ</h1>
+        <p class="page-subtitle">ミッションをクリアしてレシピを解除しよう</p>
+      </header>
+      <div id="recipe-list"></div>
+    </main>
+  </div>
+
+  <!-- レシピ詳細ビュー -->
+  <div id="view-recipe-detail" class="view">
+    <main class="main-content">
+      <div class="back-bar">
+        <button class="back-btn" id="recipe-back-btn">
+          <span class="back-icon">←</span>
+          <span>レシピ一覧に戻る</span>
+        </button>
+      </div>
+      <div id="recipe-detail-header"></div>
+      <div id="recipe-detail-content"></div>
+    </main>
+  </div>
+
+  <!-- AI生成ビュー -->
+  <div id="view-ai-generate" class="view">
+    <main class="main-content">
+      <header class="page-header">
+        <h1 class="page-title">✨ AI レシピ生成</h1>
+        <p class="page-subtitle">Claude AIがフレームワークを活用したレシピを生成します</p>
+      </header>
+
+      <div class="ai-form-card">
+        <div class="form-group">
+          <label class="form-label" for="api-key-input">Anthropic API Key</label>
+          <input
+            type="password"
+            id="api-key-input"
+            class="form-input"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+          >
+          <p class="form-hint">APIキーはブラウザのlocalStorageに保存されます</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ai-ingredients">使用する食材</label>
+          <input
+            type="text"
+            id="ai-ingredients"
+            class="form-input"
+            placeholder="例：鶏もも肉、レモン、じゃがいも"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="ai-style">料理スタイル・コンセプト</label>
+          <input
+            type="text"
+            id="ai-style"
+            class="form-input"
+            placeholder="例：フレンチビストロ風、和モダン"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">適用フレームワーク</label>
+          <div id="fw-checkboxes" class="fw-checkboxes"></div>
+        </div>
+
+        <button class="generate-btn" id="generate-btn" onclick="Api.generateRecipe()">
+          <span id="generate-btn-text">✨ レシピを生成する</span>
+        </button>
+      </div>
+
+      <div id="ai-result" class="hidden"></div>
+
+      <section class="generated-history-section">
+        <h2 class="section-title">生成済みレシピ</h2>
+        <div id="generated-history"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ボトムナビゲーション -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-view="home">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">ホーム</span>
+    </button>
+    <button class="nav-btn" data-view="roadmap">
+      <span class="nav-icon">🗺️</span>
+      <span class="nav-label">ロードマップ</span>
+    </button>
+    <button class="nav-btn" data-view="recipes">
+      <span class="nav-icon">📖</span>
+      <span class="nav-label">レシピ</span>
+    </button>
+    <button class="nav-btn" data-view="ai-generate">
+      <span class="nav-icon">✨</span>
+      <span class="nav-label">AI生成</span>
+    </button>
+  </nav>
+
+  <script src="js/app.js"></script>
+  <script src="js/roadmap.js"></script>
+  <script src="js/recipe.js"></script>
+  <script src="js/api.js"></script>
+</body>
+</html>
