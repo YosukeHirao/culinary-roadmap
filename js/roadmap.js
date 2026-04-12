@@ -322,6 +322,8 @@ const Roadmap = (() => {
    * フレームワーク詳細ビューに遷移する
    */
   function showDetail(fwId) {
+    // タブメモリに記録（他タブから戻ったとき詳細を復元する）
+    App.setTabMemory('roadmap', () => Roadmap.showDetail(fwId));
     App.navigate('framework-detail');
     renderFrameworkDetail(fwId);
   }

@@ -40,8 +40,11 @@ const Storage = (() => {
 const App = (() => {
   let currentView = 'home';
   const scrollPositions = {};
+  const tabMemory = {}; // タブごとの最後の状態（復元関数）を記憶
   // スクロール位置を保持するメインタブ
   const MAIN_VIEWS = new Set(['home', 'roadmap', 'recipes', 'ai-generate']);
+  // サブビューから親タブナビへのマッピング
+  const SUB_VIEW_PARENT = { 'recipe-detail': 'recipes', 'framework-detail': 'roadmap' };
 
   /**
    * 指定ビューに遷移する
@@ -62,16 +65,23 @@ const App = (() => {
     const viewEl = document.getElementById(`view-${viewId}`);
     if (viewEl) viewEl.classList.add('active');
 
-    // ボトムナビのアクティブ状態を更新
+    // ボトムナビのアクティブ状態を更新（サブビューは親タブをアクティブに）
+    const navTarget = SUB_VIEW_PARENT[viewId] || viewId;
     document.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === viewId);
+      btn.classList.toggle('active', btn.dataset.view === navTarget);
     });
 
-    // ビュー別初期化処理
+    // ビュー別初期化処理（タブメモリがあれば復元、なければ通常初期化）
     const initializers = {
       home: initHomeView,
-      roadmap: () => Roadmap.initView(),
-      recipes: () => Recipe.initView(),
+      roadmap: () => {
+        if (tabMemory['roadmap']) { tabMemory['roadmap'](); }
+        else { Roadmap.initView(); }
+      },
+      recipes: () => {
+        if (tabMemory['recipes']) { tabMemory['recipes'](); }
+        else { Recipe.initView(); }
+      },
       'ai-generate': () => Api.initView(),
     };
 
@@ -158,7 +168,22 @@ const App = (() => {
     navigate('home');
   }
 
-  return { navigate, init, updateOverallProgress, renderFrameworkCards };
+  /**
+   * タブの状態を記憶する（サブビューへの遷移時に呼び出す）
+   */
+  function setTabMemory(tab, fn) {
+    tabMemory[tab] = fn;
+  }
+
+  /**
+   * バックボタン用ナビゲーション：タブメモリをクリアしてリスト表示
+   */
+  function navigateBack(tab) {
+    tabMemory[tab] = null;
+    navigate(tab);
+  }
+
+  return { navigate, navigateBack, setTabMemory, init, updateOverallProgress, renderFrameworkCards };
 })();
 
 // DOMContentLoaded でアプリ起動

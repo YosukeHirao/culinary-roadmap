@@ -12,6 +12,7 @@ const Recipe = (() => {
     genre: [],
     method: [],
     ingredient: [],
+    stampedOnly: false,
   };
 
   // タグの選択肢マスター
@@ -98,10 +99,10 @@ const Recipe = (() => {
 
     if (updated) {
       Storage.saveRecipes(recipesState);
-      // レシピビューが表示中なら再描画
+      // レシピビューが表示中なら結果エリアのみ更新
       const recipeView = document.getElementById('view-recipes');
       if (recipeView && recipeView.classList.contains('active')) {
-        renderRecipeList();
+        updateRecipeResults();
       }
     }
   }
@@ -125,83 +126,50 @@ const Recipe = (() => {
   }
 
   /**
-   * レシピ一覧を描画する（フィルターバー込み）
+   * レシピ一覧を描画する（フィルターバー初期化 + 結果更新）
    */
   function renderRecipeList() {
+    setupFilterBar();
+    updateRecipeResults();
+  }
+
+  /**
+   * フィルターバーを初回のみ作成する（2回目以降はスキップ）
+   * これにより input 要素が再生成されず、フォーカスが維持される
+   */
+  function setupFilterBar() {
     const container = document.getElementById('recipe-list');
     if (!container) return;
+    if (document.getElementById('recipe-filter-bar')) return;
 
     const recipesState = Storage.getRecipes();
-
-    // 全レシピを収集
     const allBuiltin = (recipesData?.recipes || []).map(r => ({ ...r, _isGenerated: false }));
     const allGenerated = (recipesState.generated || []).map(r => ({ ...r, _isGenerated: true }));
     const allRecipes = [...allBuiltin, ...allGenerated];
 
-    // フィルター適用
-    const filtered = applyFilter(allRecipes);
-
-    // フィルターバーのHTML
-    let html = renderFilterBar(allRecipes);
-
-    if (filtered.length === 0) {
-      html += `<div class="filter-empty">条件に合うレシピが見つかりませんでした</div>`;
-    } else {
-      // 収録レシピ
-      const builtinFiltered = filtered.filter(r => !r._isGenerated);
-      if (builtinFiltered.length > 0) {
-        html += '<div class="recipe-section-title">収録レシピ</div>';
-        html += builtinFiltered.map(recipe => {
-          const isStamped = recipesState.stampedIds.includes(recipe.id);
-          return renderRecipeCard(recipe, true, isStamped, false);
-        }).join('');
-      }
-
-      // AI生成レシピ
-      const generatedFiltered = filtered.filter(r => r._isGenerated);
-      if (generatedFiltered.length > 0) {
-        html += '<div class="recipe-section-title" style="margin-top:20px">AI生成レシピ</div>';
-        html += generatedFiltered.map(recipe => {
-          const isStamped = recipesState.stampedIds.includes(recipe.id);
-          return renderRecipeCard(recipe, true, isStamped, true);
-        }).join('');
-      }
-    }
-
-    container.innerHTML = html;
-
-    // 検索中はフォーカスを維持する（再描画でinputが置き換わるため）
-    if (filterState.search) {
-      const searchInput = container.querySelector('.filter-search');
-      if (searchInput) {
-        searchInput.focus();
-        const len = searchInput.value.length;
-        searchInput.setSelectionRange(len, len);
-      }
-    }
+    container.innerHTML = `
+      <div id="recipe-filter-bar">${renderFilterBarHTML(allRecipes)}</div>
+      <div id="recipe-results"></div>
+    `;
   }
 
   /**
-   * フィルターバーのHTMLを生成する
+   * フィルターバーのHTML文字列を生成する（初回作成時のみ使用）
    */
-  function renderFilterBar(allRecipes) {
-    // 実際に存在するタグだけをカウント
+  function renderFilterBarHTML(allRecipes) {
     function countTag(category, value) {
       return allRecipes.filter(r => (r.tags?.[category] || []).includes(value)).length;
     }
-
     function chipGroup(category, label) {
       const options = TAG_OPTIONS[category];
       const chips = options.map(val => {
         const count = countTag(category, val);
         if (count === 0) return '';
         const active = filterState[category].includes(val) ? 'active' : '';
-        return `<button class="filter-chip ${active}" onclick="Recipe.toggleFilter('${category}','${val}')">${val} <span class="chip-count">${count}</span></button>`;
+        return `<button class="filter-chip ${active}" data-category="${category}" data-value="${escapeHtml(val)}" onclick="Recipe.toggleFilter('${category}','${val}')">${val} <span class="chip-count">${count}</span></button>`;
       }).join('');
       return chips ? `<div class="filter-group"><span class="filter-group-label">${label}</span><div class="filter-chips">${chips}</div></div>` : '';
     }
-
-    const hasActiveFilter = filterState.search || filterState.genre.length || filterState.method.length || filterState.ingredient.length;
 
     return `
       <div class="filter-bar">
@@ -213,7 +181,13 @@ const Recipe = (() => {
             value="${escapeHtml(filterState.search)}"
             oninput="Recipe.onSearchInput(this.value)"
           />
-          ${hasActiveFilter ? `<button class="filter-clear-btn" onclick="Recipe.clearFilter()">✕ クリア</button>` : ''}
+          <button class="filter-clear-btn" style="display:none" onclick="Recipe.clearFilter()">✕ クリア</button>
+        </div>
+        <div class="filter-group">
+          <span class="filter-group-label">状態</span>
+          <div class="filter-chips">
+            <button class="filter-chip ${filterState.stampedOnly ? 'active' : ''}" id="filter-stamped-btn" onclick="Recipe.toggleStampedFilter()">✓ 作った済み</button>
+          </div>
         </div>
         ${chipGroup('genre', 'ジャンル')}
         ${chipGroup('method', '調理法')}
@@ -223,24 +197,82 @@ const Recipe = (() => {
   }
 
   /**
+   * レシピ結果エリアのみを更新する（フィルターバーは触らない）
+   */
+  function updateRecipeResults() {
+    const resultsEl = document.getElementById('recipe-results');
+    if (!resultsEl) return;
+
+    const recipesState = Storage.getRecipes();
+    const allBuiltin = (recipesData?.recipes || []).map(r => ({ ...r, _isGenerated: false }));
+    const allGenerated = (recipesState.generated || []).map(r => ({ ...r, _isGenerated: true }));
+    const allRecipes = [...allBuiltin, ...allGenerated];
+    const filtered = applyFilter(allRecipes, recipesState);
+
+    let html = '';
+    if (filtered.length === 0) {
+      html = `<div class="filter-empty">条件に合うレシピが見つかりませんでした</div>`;
+    } else {
+      const builtinFiltered = filtered.filter(r => !r._isGenerated);
+      if (builtinFiltered.length > 0) {
+        html += '<div class="recipe-section-title">収録レシピ</div>';
+        html += builtinFiltered.map(recipe => {
+          const isStamped = recipesState.stampedIds.includes(recipe.id);
+          return renderRecipeCard(recipe, true, isStamped, false);
+        }).join('');
+      }
+      const generatedFiltered = filtered.filter(r => r._isGenerated);
+      if (generatedFiltered.length > 0) {
+        html += '<div class="recipe-section-title" style="margin-top:20px">AI生成レシピ</div>';
+        html += generatedFiltered.map(recipe => {
+          const isStamped = recipesState.stampedIds.includes(recipe.id);
+          return renderRecipeCard(recipe, true, isStamped, true);
+        }).join('');
+      }
+    }
+    resultsEl.innerHTML = html;
+  }
+
+  /**
+   * フィルターバーのUI状態（チップ・クリアボタン）だけを更新する
+   */
+  function updateFilterBarUI() {
+    document.querySelectorAll('.filter-chip[data-category]').forEach(chip => {
+      const category = chip.dataset.category;
+      const value = chip.dataset.value;
+      chip.classList.toggle('active', filterState[category]?.includes(value) || false);
+    });
+    const stampedBtn = document.getElementById('filter-stamped-btn');
+    if (stampedBtn) stampedBtn.classList.toggle('active', filterState.stampedOnly);
+
+    const hasActive = filterState.search || filterState.genre.length || filterState.method.length || filterState.ingredient.length || filterState.stampedOnly;
+    const clearBtn = document.querySelector('.filter-clear-btn');
+    if (clearBtn) clearBtn.style.display = hasActive ? '' : 'none';
+  }
+
+  /**
    * フィルターを適用して絞り込んだレシピ配列を返す
    */
-  function applyFilter(recipes) {
+  function applyFilter(recipes, recipesState) {
     return recipes.filter(recipe => {
-      // テキスト検索
+      // 作った済みフィルター
+      if (filterState.stampedOnly) {
+        if (!recipesState.stampedIds.includes(recipe.id)) return false;
+      }
+      // テキスト検索（タイトル・サブタイトル・食材名）
       if (filterState.search) {
         const q = filterState.search.toLowerCase();
-        const searchTarget = [recipe.title, recipe.subtitle, recipe.ingredients]
+        const ingredientNames = (recipe.ingredients || []).map(i => i.name || i).join(' ');
+        const searchTarget = [recipe.title, recipe.subtitle, ingredientNames]
           .filter(Boolean).join(' ').toLowerCase();
         if (!searchTarget.includes(q)) return false;
       }
       // タグフィルター（カテゴリをまたいでAND、カテゴリ内はOR）
-      // タグが未設定のレシピはすべてのフィルターをパスする
       for (const category of ['genre', 'method', 'ingredient']) {
         const selected = filterState[category];
         if (selected.length === 0) continue;
         const recipeTags = recipe.tags?.[category] || [];
-        if (recipeTags.length === 0) continue; // タグ未設定は除外しない
+        if (recipeTags.length === 0) continue;
         if (!selected.some(s => recipeTags.includes(s))) return false;
       }
       return true;
@@ -252,7 +284,8 @@ const Recipe = (() => {
    */
   function onSearchInput(value) {
     filterState.search = value;
-    renderRecipeList();
+    updateRecipeResults();
+    updateFilterBarUI();
   }
 
   /**
@@ -263,15 +296,28 @@ const Recipe = (() => {
     const idx = arr.indexOf(value);
     if (idx === -1) arr.push(value);
     else arr.splice(idx, 1);
-    renderRecipeList();
+    updateRecipeResults();
+    updateFilterBarUI();
+  }
+
+  /**
+   * 「作った済み」フィルターのトグル
+   */
+  function toggleStampedFilter() {
+    filterState.stampedOnly = !filterState.stampedOnly;
+    updateRecipeResults();
+    updateFilterBarUI();
   }
 
   /**
    * フィルターをすべてリセットする
    */
   function clearFilter() {
-    filterState = { search: '', genre: [], method: [], ingredient: [] };
-    renderRecipeList();
+    filterState = { search: '', genre: [], method: [], ingredient: [], stampedOnly: false };
+    const searchInput = document.querySelector('.filter-search');
+    if (searchInput) searchInput.value = '';
+    updateRecipeResults();
+    updateFilterBarUI();
   }
 
   /**
@@ -344,11 +390,14 @@ const Recipe = (() => {
 
     if (!recipe) return;
 
-    // バックボタンの設定
+    // バックボタンの設定（navigateBackでタブメモリをクリアして一覧へ戻る）
     const backBtn = document.getElementById('recipe-back-btn');
     if (backBtn) {
-      backBtn.onclick = () => App.navigate('recipes');
+      backBtn.onclick = () => App.navigateBack('recipes');
     }
+
+    // タブメモリに記録（他タブから戻ったとき詳細を復元する）
+    App.setTabMemory('recipes', () => Recipe.showDetail(recipeId, isGenerated));
 
     App.navigate('recipe-detail');
     renderRecipeDetail(recipe, isGenerated);
@@ -636,6 +685,7 @@ const Recipe = (() => {
     formatMarkdown,
     onSearchInput,
     toggleFilter,
+    toggleStampedFilter,
     clearFilter,
     startTitleEdit,
     cancelTitleEdit,
