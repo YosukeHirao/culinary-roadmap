@@ -60,7 +60,10 @@ a {
 .main-content {
   max-width: 480px;
   margin: 0 auto;
-  padding: 16px 16px calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 24px);
+  padding:
+    calc(env(safe-area-inset-top, 0px) + 24px)
+    20px
+    calc(var(--nav-height) + env(safe-area-inset-bottom, 0px) + 32px);
 }
 
 /* =============================================
