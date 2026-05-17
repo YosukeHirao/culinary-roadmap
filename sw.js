@@ -1,4 +1,4 @@
-const CACHE_NAME = 'culinary-master-v6';
+const CACHE_NAME = 'culinary-master-v7';
 const ASSETS = [
   '/culinary-roadmap/',
   '/culinary-roadmap/index.html',
